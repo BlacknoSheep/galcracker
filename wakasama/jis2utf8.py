@@ -1,7 +1,7 @@
 import os
 
-input_folder = ""
-output_folder = ""
+input_folder = r""
+output_folder = r""
 
 # 确保输出目录存在
 os.makedirs(output_folder, exist_ok=True)
