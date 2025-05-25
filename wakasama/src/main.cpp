@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     std::vector<BYTE> buffer(fi.size);
     readFile(fs, fi.offset, fi.size, buffer);
     decrypt(buffer, fi);
-    saveFile(buffer, fi.size, outdir + '/' + filename);
+    saveFile(buffer, buffer.size(), outdir + '/' + filename);
     ++cnt_done;
   }
   std::cout << "共读入了" << fileinfos.size() << "个文件" << std::endl;

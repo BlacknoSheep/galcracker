@@ -141,7 +141,7 @@ void decrypt(std::vector<BYTE> &buffer, const FileInfo &fi) {
   case 6: {
     decrypt6(buffer, fi.crc_low);
     std::vector<BYTE> decompressed_buffer(fi.unpacked_size);
-    decompress_zlib(buffer, decompressed_buffer, fi.unpacked_size);
+    decompress_zlib(buffer, decompressed_buffer);
     buffer = decompressed_buffer;
     break;
   }

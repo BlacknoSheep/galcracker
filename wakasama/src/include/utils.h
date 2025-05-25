@@ -81,15 +81,27 @@ void saveFile(const std::vector<BYTE> &buffer, size_t size,
   fs.close();
 }
 
-bool decompress_zlib(const std::vector<BYTE> &input, std::vector<BYTE> &output,
-                     size_t uncompressed_size) {
-  uLongf uncompressedSize = uncompressed_size * 2; // 用两倍大小避免失败
+bool decompress_zlib(const std::vector<BYTE> &input,
+                     std::vector<BYTE> &output) {
+  uLongf uncompressedSize =
+      output.size() > 0 ? output.size() : input.size() * 5;
   output.resize(uncompressedSize);
 
-  int ret =
-      uncompress(output.data(), &uncompressedSize, input.data(), input.size());
-  if (ret != Z_OK)
-    errExit("Decompression failed, error code: ");
+  while (true) {
+    int ret = uncompress(output.data(), &uncompressedSize, input.data(),
+                         input.size());
+    if (ret == Z_BUF_ERROR) {
+      // 输出缓冲区过小，翻倍
+      uncompressedSize *= 2;
+      output.resize(uncompressedSize);
+    } else {
+      if (ret != Z_OK) {
+        std::cerr << "zlib解压文件失败！" << std::endl;
+        return false;
+      }
+      break;
+    }
+  }
 
   // 修正最终解压后的数据大小
   output.resize(uncompressedSize);
