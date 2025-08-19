@@ -23,16 +23,21 @@ int main(int argc, char *argv[]) {
   std::vector<FileInfo> fileinfos = getFileInfosFromDat(datfilepath);
 
   // 统计0~6类和其他类加密文件的数量和成功解密的数量
-  std::vector<std::vector<int>> stats(8, std::vector<int>(2));
+  std::unordered_map<int, std::vector<int>> stats;
 
   // 读入并解密文件
   std::ifstream fs;
   fs.open(datfilepath, std::ios::binary);
   if (!fs)
     errExit("文件打开失败！");
-  int cnt_done = 0; // 成功解密的文件数
+  int cnt_done = 0; // 成功提取的文件数
   std::string filepath;
   for (FileInfo &fi : fileinfos) {
+    // 统计信息初始化
+    if (stats.count(fi.encrypt_type) == 0)
+      stats[fi.encrypt_type] = {0, 0}; // {总数, 成功解密数}
+    ++stats[fi.encrypt_type][0];
+
     std::vector<BYTE> key;
 
     if (listkey_to_key.count(fi.listkey)) {
@@ -45,34 +50,26 @@ int main(int argc, char *argv[]) {
 
     // 未加密，根据文件头判断应该是avi
     if (fi.encrypt_type == 0) {
-      ++stats[fi.encrypt_type][0];
-      ++stats[fi.encrypt_type][1];
-
       if (key.empty())
         filepath += ".avi";
     }
+
     // 普通加密
     else if (fi.encrypt_type == 1 || fi.encrypt_type == 5) {
-      ++stats[fi.encrypt_type][0];
-
       // 没有key则无法解密，跳过
       if (key.empty())
         continue;
       fi.updateWithKey(key);
-
-      ++stats[fi.encrypt_type][1];
     }
+
     // 6类加密，不需要key
     else if (fi.encrypt_type == 6) {
-      ++stats[fi.encrypt_type][0];
-      ++stats[fi.encrypt_type][1];
-
       if (key.empty())
         filepath = filepath + ".txt";
     }
+
     // 跳过其他未知类型
     else {
-      ++stats[7][0];
       continue;
     }
 
@@ -80,16 +77,18 @@ int main(int argc, char *argv[]) {
     readFile(fs, fi.offset, fi.size, buffer);
     decrypt(buffer, fi);
     saveFile(buffer, buffer.size(), outdir + '/' + filepath);
+    ++stats[fi.encrypt_type][1]; // 成功解密数加1
     ++cnt_done;
   }
 
-  std::cout << "共读入了" << fileinfos.size() << "个文件" << std::endl;
+  std::cout << "共包含" << fileinfos.size() << "个文件" << std::endl;
   std::cout << "成功提取" << cnt_done << "个文件" << std::endl;
 
   std::cout << "统计信息：" << std::endl;
   std::cout << "加密类型\t总数\t成功解密" << std ::endl;
-  for (int i = 0; i < stats.size(); ++i) {
-    std::cout << i << "\t\t" << stats[i][0] << "\t" << stats[i][1] << std::endl;
+  for (const auto &pair : stats) {
+    std::cout << pair.first << "\t\t" << pair.second[0] << "\t"
+              << pair.second[1] << std::endl;
   }
 
   fs.close();

@@ -6,7 +6,7 @@ import os
 import re
 
 # 指定你要操作的文件夹路径
-folder_path = r'C:\Users\kotor\Documents\翻校\waka\script2.dat_utf8'  # 改成你的实际目录
+folder_path = r''  # 改成你的实际目录
 
 # 定义匹配模式
 pattern = re.compile(r'^\*[A-Za-z0-9_]+')
