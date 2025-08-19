@@ -9,12 +9,14 @@
 const DWORD M1 = 0x8B6A4E5F; // 用于计算文件数量的固定值
 const DWORD M2 = 0xBABA18A9; // 用于解密encrypt_type==6的文件
 
+// 根据crc64的低高位计算出一个用于索引的key
 inline DWORD getListkey(DWORD low, DWORD high) {
   return ((high << 6) + low + (high >> 2)) ^ high;
 }
 
-DWORD getListkey(const std::string &key) {
-  auto [low, high] = crc64(std::vector<BYTE>(key.begin(), key.end()));
+// 根据字符串计算出一个用于索引的key
+DWORD getListkey(const std::vector<BYTE> &key) {
+  auto [low, high] = crc64(key);
   return getListkey(low, high);
 }
 
@@ -23,16 +25,19 @@ public:
   std::vector<BYTE> raw; // 从dat文件中读入的原始数据,长度为21字节
 
   // exe程序利用读入的原始数据初步计算并保存于数据结构的信息
-  DWORD listkey;           // 通过哈希值计算得到，用于索引
-  DWORD crc_low, crc_high; // key（文件相对路径）的哈希值
-  DWORD encrypt_type; // 加密类型：0未加密；1加密；5加密；6加密&压缩
-  DWORD offset; // 文件偏移量，可能被key加密
-  DWORD size;   // 文件字节数，可能被key加密
-  DWORD unpacked_size; // 解包后的文件字节数，文件未压缩则此字段无用
+  // 共21B
+  DWORD crc_low, crc_high; // 8B，key（文件相对路径）的哈希值
+  DWORD encrypt_type; // 1B，加密类型：0未加密；1加密；5加密；6加密&压缩
+  DWORD offset; // 4B，文件偏移量，可能被key加密
+  DWORD size;   // 4B，文件字节数，可能被key加密
+  DWORD unpacked_size; // 4B，解包后的文件字节数，文件未压缩则此字段无用
+
+  DWORD listkey; // 4B，根据密钥字符串的crc64值计算得到，用于索引
+
   std::string datfilename; // 文件来源于哪个dat文件
 
-  // 密钥，游戏直接使用打包时文件的相对路径进行的加密
-  std::string key;
+  // 密钥，游戏使用的是打包时文件的相对路径进行的加密
+  std::vector<BYTE> key;
 
   FileInfo() : raw(std::vector<BYTE>(21)) {}
 
@@ -64,9 +69,9 @@ public:
   }
 
   // 使用密钥更新文件信息
-  void updateWithKey(const std::string &key) {
+  void updateWithKey(const std::vector<BYTE> &key) {
     this->key = key;
-    size_t n = key.length();
+    size_t n = key.size();
     offset = key[n >> 1] ^ offset;
     size = key[n >> 2] ^ size;
   }
@@ -101,9 +106,9 @@ std::vector<FileInfo> getFileInfosFromDat(const std::string &datfilepath) {
   return fileinfos;
 }
 
-std::unordered_map<DWORD, std::string>
-getHashkeyToKey(std::vector<std::string> &keys) {
-  std::unordered_map<DWORD, std::string> mp;
+std::unordered_map<DWORD, std::vector<BYTE>>
+getListkeyToKey(std::vector<std::vector<BYTE>> &keys) {
+  std::unordered_map<DWORD, std::vector<BYTE>> mp;
   for (auto &key : keys) {
     mp[getListkey(key)] = key;
   }
@@ -111,8 +116,8 @@ getHashkeyToKey(std::vector<std::string> &keys) {
 }
 
 // 解密函数encrypt_type==1或5的数据
-void decrypt1(std::vector<BYTE> &buffer, const std::string &key) {
-  size_t key_size = key.length();
+void decrypt1(std::vector<BYTE> &buffer, const std::vector<BYTE> &key) {
+  size_t key_size = key.size();
   if (key_size == 0)
     return;
   size_t part_size = buffer.size() / key_size;

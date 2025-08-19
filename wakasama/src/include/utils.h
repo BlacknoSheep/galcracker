@@ -39,6 +39,7 @@ void createDirectories(const std::string &path) {
   system(cmd.c_str());
 }
 
+// 从文件路径获取文件名
 inline std::string getFilenameFromPath(const std::string &file_path) {
   size_t pos = file_path.find_last_of("/\\");
   if (pos != std::string::npos) {
@@ -47,6 +48,7 @@ inline std::string getFilenameFromPath(const std::string &file_path) {
   return file_path; // 如果没有找到路径分隔符，返回原字符串
 }
 
+// 从文件路径获取文件所在目录
 inline std::string getDirectoryFromPath(const std::string &file_path) {
   size_t pos = file_path.find_last_of("/\\");
   if (pos != std::string::npos) {
@@ -81,6 +83,7 @@ void saveFile(const std::vector<BYTE> &buffer, size_t size,
   fs.close();
 }
 
+// 解压zlib压缩数据
 bool decompress_zlib(const std::vector<BYTE> &input,
                      std::vector<BYTE> &output) {
   uLongf uncompressedSize =
@@ -106,4 +109,51 @@ bool decompress_zlib(const std::vector<BYTE> &input,
   // 修正最终解压后的数据大小
   output.resize(uncompressedSize);
   return true;
+}
+
+// 一次性将文件读入内存，然后按行拆分成
+// std::vector<std::vector<BYTE>>，保证每行内容逐字节和原文件一致
+std::vector<std::vector<BYTE>>
+readFileLinesAsBytes(const std::string &filename) {
+  // 打开文件
+  std::ifstream file(filename, std::ios::binary | std::ios::ate);
+  if (!file) {
+    throw std::runtime_error("Failed to open file: " + filename);
+  }
+
+  // 获取文件大小并读取整个文件到缓冲区
+  std::streamsize fileSize = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  std::vector<BYTE> buffer(fileSize);
+  if (!file.read(reinterpret_cast<char *>(buffer.data()), fileSize)) {
+    throw std::runtime_error("Failed to read file: " + filename);
+  }
+
+  std::vector<std::vector<BYTE>> lines;
+  std::vector<BYTE> currentLine;
+
+  for (size_t i = 0; i < buffer.size(); ++i) {
+    BYTE b = buffer[i];
+    if (b == '\n') {
+      lines.push_back(currentLine);
+      currentLine.clear();
+    } else if (b == '\r') {
+      // Windows CRLF：如果下一个字节是 '\n'，跳过
+      if (i + 1 < buffer.size() && buffer[i + 1] == '\n') {
+        ++i;
+      }
+      lines.push_back(currentLine);
+      currentLine.clear();
+    } else {
+      currentLine.push_back(b);
+    }
+  }
+
+  // 保存最后一行（如果没有换行符结尾）
+  if (!currentLine.empty()) {
+    lines.push_back(currentLine);
+  }
+
+  return lines;
 }

@@ -1,3 +1,7 @@
+"""
+以Shift_JIS编码读取文本文件，然后转换为UTF-8编码并保存
+"""
+
 import os
 
 input_folder = r""
